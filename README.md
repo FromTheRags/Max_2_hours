@@ -1,4 +1,8 @@
-# Max_2_hours (Protect & Perf) - Minuteur SDL 3 Remastérisé
+# Max_2_hours  - Pomodoro / Minuteur
+
+<p align="center">
+  <img src="demo/windows.png" alt="Aperçu de Max_2_hours" />
+</p>
 
 [![Build & Package (SDL 3)](https://github.com/FromTheRags/Max_2_hours/actions/workflows/build.yml/badge.svg?branch=SDL_3)](https://github.com/FromTheRags/Max_2_hours/actions/workflows/build.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
