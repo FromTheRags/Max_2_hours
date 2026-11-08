@@ -11,8 +11,8 @@ Consultez le fichier [LICENSE](LICENSE) pour le texte complet de la licence.
   - Licence : **SIL Open Font License, Version 1.1** (voir [OFL.txt](OFL.txt))
 
 ## 3. Éléments graphiques (Assets)
-- `assets/app_icon.bmp` (icône de fenêtre)
-- `assets/clock.ico` (icône de l'exécutable Windows)
+- `assets/app_icon.bmp` et `assets/app_icon_pause.bmp` (icônes normale et pause)
+- `assets/clock.ico` et `assets/clock_pause.ico` (icônes Windows multi-formats normale et pause)
 - `assets/play.bmp` et `assets/play.png` (bouton de lecture / pause)
 
 Tous ces éléments graphiques sont des créations originales dédiées au domaine public sous licence **Creative Commons Zero 1.0 Universal** (CC0 1.0).

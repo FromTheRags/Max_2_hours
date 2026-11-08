@@ -46,15 +46,16 @@ extern "C" {
     #endif
 #endif
 
-// Dimensions de la fenêtre : largeur suffisante (360px) pour que
-// le titre de la fenêtre ("Protect & Perf - 2 Heures") soit parfaitement
-// visible dans la barre de titre du système sans être tronqué
+// Titre court et dimensions adaptées pour une visibilité parfaite du titre
+const char *TITRE_APPLICATION = "Protect & Perf";
 const int FENETRE_L = 360;
 const int FENETRE_H = 60;
 
 // Variables globales d'état
 static SDL_Surface *g_ecran = NULL;
 static SDL_Surface *g_play_surface = NULL;
+static SDL_Surface *g_icon_normal = NULL;
+static SDL_Surface *g_icon_pause = NULL;
 static TTF_Font *g_police = NULL;
 static SDL_TimerID g_timer = NULL;
 
@@ -63,12 +64,14 @@ static int g_minutes = 0;
 static int g_secondes = 0;
 static int g_playing = 1;
 static bool g_only_one = true;
+static Uint32 g_last_restore_time = 0;
 
 static const SDL_Color g_couleur_orange = {255, 123, 0, 0};
 
 // Déclarations préalables
 static void basculer_pause();
 static void actualiser_affichage();
+static void actualiser_tray();
 
 #if defined(_WIN32)
 #define WM_TRAYICON (WM_USER + 1)
@@ -80,6 +83,8 @@ static HWND g_hwnd = NULL;
 static NOTIFYICONDATAA g_nid;
 static bool g_in_tray = false;
 static WNDPROC g_old_wndproc = NULL;
+static HICON g_hicon_normal = NULL;
+static HICON g_hicon_pause = NULL;
 
 static void restaurer_depuis_tray();
 
@@ -99,7 +104,7 @@ static LRESULT CALLBACK TraySubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
             GetCursorPos(&pt);
             HMENU hMenu = CreatePopupMenu();
             AppendMenuA(hMenu, MF_STRING, ID_TRAY_RESTAURER, "Afficher la fenetre");
-            AppendMenuA(hMenu, MF_STRING, ID_TRAY_PAUSE, "Pause / Reprendre");
+            AppendMenuA(hMenu, MF_STRING, ID_TRAY_PAUSE, (g_playing == 1) ? "Pause" : "Reprendre");
             AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenuA(hMenu, MF_STRING, ID_TRAY_QUITTER, "Quitter");
 
@@ -141,21 +146,22 @@ static void minimiser_vers_tray()
         g_nid.uID = 1;
         g_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         g_nid.uCallbackMessage = WM_TRAYICON;
-        g_nid.hIcon = (HICON)GetClassLongPtr(g_hwnd, GCLP_HICONSM);
+        g_nid.hIcon = (g_playing == 1) ? g_hicon_normal : g_hicon_pause;
         if (!g_nid.hIcon)
         {
             g_nid.hIcon = (HICON)GetClassLongPtr(g_hwnd, GCLP_HICON);
         }
-        snprintf(g_nid.szTip, sizeof(g_nid.szTip), "Protect & Perf - %02d : %02d : %02d", g_heures, g_minutes, g_secondes);
+        snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
         Shell_NotifyIconA(NIM_ADD, &g_nid);
     }
 }
 
-// Restaurer depuis le System Tray
+// Restauration en un seul clic depuis le System Tray
 static void restaurer_depuis_tray()
 {
     if (g_hwnd && g_in_tray)
     {
+        g_last_restore_time = SDL_GetTicks();
         Shell_NotifyIconA(NIM_DELETE, &g_nid);
         g_in_tray = false;
         ShowWindow(g_hwnd, SW_SHOW);
@@ -164,12 +170,25 @@ static void restaurer_depuis_tray()
     }
 }
 
-// Mise à jour de l'infobulle du System Tray
-static void actualiser_tray_tooltip()
+// Mise à jour de l'icône et de l'infobulle du System Tray (normale vs pause)
+static void actualiser_tray()
 {
     if (g_in_tray)
     {
-        snprintf(g_nid.szTip, sizeof(g_nid.szTip), "Protect & Perf - %02d : %02d : %02d", g_heures, g_minutes, g_secondes);
+        g_nid.hIcon = (g_playing == 1) ? g_hicon_normal : g_hicon_pause;
+        if (!g_nid.hIcon)
+        {
+            g_nid.hIcon = (HICON)GetClassLongPtr(g_hwnd, GCLP_HICON);
+        }
+        if (g_playing == 1)
+        {
+            snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
+        }
+        else
+        {
+            snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s [PAUSE] - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
+        }
+        g_nid.uFlags = NIF_ICON | NIF_TIP;
         Shell_NotifyIconA(NIM_MODIFY, &g_nid);
     }
 }
@@ -301,7 +320,7 @@ static void tick_seconde()
     actualiser_affichage();
 
 #if defined(_WIN32)
-    actualiser_tray_tooltip();
+    actualiser_tray();
 #endif
 }
 
@@ -317,15 +336,26 @@ static void basculer_pause()
             g_timer = NULL;
         }
         g_playing = 0;
-        actualiser_affichage();
+        if (g_icon_pause)
+        {
+            SDL_WM_SetIcon(g_icon_pause, NULL);
+        }
     }
     else
     {
         // Reprise du décompte
         g_playing = 1;
-        actualiser_affichage();
+        if (g_icon_normal)
+        {
+            SDL_WM_SetIcon(g_icon_normal, NULL);
+        }
         g_timer = SDL_AddTimer(1000, timer_callback, NULL);
     }
+    actualiser_affichage();
+
+#if defined(_WIN32)
+    actualiser_tray();
+#endif
 }
 
 int main(int argc, char** argv)
@@ -348,17 +378,25 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    // Chargement de l'icône de la fenêtre
+    // Chargement de l'icône normale
     std::string icon_path = get_asset_path("app_icon.bmp");
-    SDL_Surface *icon = SDL_LoadBMP(icon_path.c_str());
-    if (icon)
+    g_icon_normal = SDL_LoadBMP(icon_path.c_str());
+    if (g_icon_normal)
     {
-        SDL_SetColorKey(icon, SDL_SRCCOLORKEY, SDL_MapRGB(icon->format, 255, 0, 255));
-        SDL_WM_SetIcon(icon, NULL);
+        SDL_SetColorKey(g_icon_normal, SDL_SRCCOLORKEY, SDL_MapRGB(g_icon_normal->format, 255, 0, 255));
+        SDL_WM_SetIcon(g_icon_normal, NULL);
     }
 
-    // Titre de la fenêtre
-    SDL_WM_SetCaption("Protect & Perf - 2 Heures", NULL);
+    // Chargement de l'icône pause
+    std::string icon_pause_path = get_asset_path("app_icon_pause.bmp");
+    g_icon_pause = SDL_LoadBMP(icon_pause_path.c_str());
+    if (g_icon_pause)
+    {
+        SDL_SetColorKey(g_icon_pause, SDL_SRCCOLORKEY, SDL_MapRGB(g_icon_pause->format, 255, 0, 255));
+    }
+
+    // Titre court de la fenêtre
+    SDL_WM_SetCaption(TITRE_APPLICATION, NULL);
 
     // Création de la fenêtre
     g_ecran = SDL_SetVideoMode(FENETRE_L, FENETRE_H, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
@@ -375,6 +413,11 @@ int main(int argc, char** argv)
     {
         g_old_wndproc = (WNDPROC)SetWindowLongPtrA(g_hwnd, GWLP_WNDPROC, (LONG_PTR)TraySubclassProc);
     }
+    // Chargement des icônes HICON pour la zone de notification Windows
+    std::string ico_normal_path = get_asset_path("clock.ico");
+    g_hicon_normal = (HICON)LoadImageA(NULL, ico_normal_path.c_str(), IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
+    std::string ico_pause_path = get_asset_path("clock_pause.ico");
+    g_hicon_pause = (HICON)LoadImageA(NULL, ico_pause_path.c_str(), IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
 #endif
 
     // Chargement de la police libre (Patrick Hand sous licence SIL OFL)
@@ -424,10 +467,14 @@ int main(int argc, char** argv)
                 if ((event.active.state & SDL_APPACTIVE) == SDL_APPACTIVE)
                 {
                     // Si minimisée : masquer et basculer dans le systray
+                    // (ignore les événements transitoires dans les 500ms d'une restauration)
                     if (event.active.gain == 0 && g_playing == 1)
                     {
 #if defined(_WIN32)
-                        minimiser_vers_tray();
+                        if (SDL_GetTicks() - g_last_restore_time > 500)
+                        {
+                            minimiser_vers_tray();
+                        }
 #endif
                     }
                 }
@@ -446,6 +493,8 @@ int main(int argc, char** argv)
     {
         SetWindowLongPtrA(g_hwnd, GWLP_WNDPROC, (LONG_PTR)g_old_wndproc);
     }
+    if (g_hicon_normal) DestroyIcon(g_hicon_normal);
+    if (g_hicon_pause) DestroyIcon(g_hicon_pause);
 #endif
 
     if (g_timer)
@@ -458,9 +507,15 @@ int main(int argc, char** argv)
         SDL_FreeSurface(g_play_surface);
         g_play_surface = NULL;
     }
-    if (icon)
+    if (g_icon_normal)
     {
-        SDL_FreeSurface(icon);
+        SDL_FreeSurface(g_icon_normal);
+        g_icon_normal = NULL;
+    }
+    if (g_icon_pause)
+    {
+        SDL_FreeSurface(g_icon_pause);
+        g_icon_pause = NULL;
     }
     if (g_police)
     {
