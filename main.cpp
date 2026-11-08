@@ -16,6 +16,7 @@ extern "C" {
 #if defined(_WIN32)
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
+    #include <shellapi.h>
 #endif
 
 #if defined(__APPLE__)
@@ -45,9 +46,11 @@ extern "C" {
     #endif
 #endif
 
-// Dimensions de la fenêtre
-const int FENETRE_L = 245;
-const int FENETRE_H = 40;
+// Dimensions de la fenêtre : largeur suffisante (360px) pour que
+// le titre de la fenêtre ("Protect & Perf - 2 Heures") soit parfaitement
+// visible dans la barre de titre du système sans être tronqué
+const int FENETRE_L = 360;
+const int FENETRE_H = 60;
 
 // Variables globales d'état
 static SDL_Surface *g_ecran = NULL;
@@ -61,11 +64,116 @@ static int g_secondes = 0;
 static int g_playing = 1;
 static bool g_only_one = true;
 
-#if defined(_WIN32)
-static HWND g_hwnd = NULL;
-#endif
-
 static const SDL_Color g_couleur_orange = {255, 123, 0, 0};
+
+// Déclarations préalables
+static void basculer_pause();
+static void actualiser_affichage();
+
+#if defined(_WIN32)
+#define WM_TRAYICON (WM_USER + 1)
+#define ID_TRAY_RESTAURER 1001
+#define ID_TRAY_PAUSE     1002
+#define ID_TRAY_QUITTER   1003
+
+static HWND g_hwnd = NULL;
+static NOTIFYICONDATAA g_nid;
+static bool g_in_tray = false;
+static WNDPROC g_old_wndproc = NULL;
+
+static void restaurer_depuis_tray();
+
+// Procédure de sous-classement pour intercepter les clics sur l'icône de la barre des tâches
+static LRESULT CALLBACK TraySubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    if (uMsg == WM_TRAYICON)
+    {
+        if (lParam == WM_LBUTTONDBLCLK || lParam == WM_LBUTTONUP)
+        {
+            restaurer_depuis_tray();
+            return 0;
+        }
+        else if (lParam == WM_RBUTTONUP)
+        {
+            POINT pt;
+            GetCursorPos(&pt);
+            HMENU hMenu = CreatePopupMenu();
+            AppendMenuA(hMenu, MF_STRING, ID_TRAY_RESTAURER, "Afficher la fenetre");
+            AppendMenuA(hMenu, MF_STRING, ID_TRAY_PAUSE, "Pause / Reprendre");
+            AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenuA(hMenu, MF_STRING, ID_TRAY_QUITTER, "Quitter");
+
+            SetForegroundWindow(hwnd);
+            int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, hwnd, NULL);
+            DestroyMenu(hMenu);
+
+            if (cmd == ID_TRAY_RESTAURER)
+            {
+                restaurer_depuis_tray();
+            }
+            else if (cmd == ID_TRAY_PAUSE)
+            {
+                basculer_pause();
+            }
+            else if (cmd == ID_TRAY_QUITTER)
+            {
+                SDL_Event ev;
+                ev.type = SDL_QUIT;
+                SDL_PushEvent(&ev);
+            }
+            return 0;
+        }
+    }
+    return CallWindowProc(g_old_wndproc, hwnd, uMsg, wParam, lParam);
+}
+
+// Minimiser vers le System Tray
+static void minimiser_vers_tray()
+{
+    if (g_hwnd && !g_in_tray)
+    {
+        ShowWindow(g_hwnd, SW_HIDE);
+        g_in_tray = true;
+
+        ZeroMemory(&g_nid, sizeof(g_nid));
+        g_nid.cbSize = sizeof(g_nid);
+        g_nid.hWnd = g_hwnd;
+        g_nid.uID = 1;
+        g_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        g_nid.uCallbackMessage = WM_TRAYICON;
+        g_nid.hIcon = (HICON)GetClassLongPtr(g_hwnd, GCLP_HICONSM);
+        if (!g_nid.hIcon)
+        {
+            g_nid.hIcon = (HICON)GetClassLongPtr(g_hwnd, GCLP_HICON);
+        }
+        snprintf(g_nid.szTip, sizeof(g_nid.szTip), "Protect & Perf - %02d : %02d : %02d", g_heures, g_minutes, g_secondes);
+        Shell_NotifyIconA(NIM_ADD, &g_nid);
+    }
+}
+
+// Restaurer depuis le System Tray
+static void restaurer_depuis_tray()
+{
+    if (g_hwnd && g_in_tray)
+    {
+        Shell_NotifyIconA(NIM_DELETE, &g_nid);
+        g_in_tray = false;
+        ShowWindow(g_hwnd, SW_SHOW);
+        ShowWindow(g_hwnd, SW_RESTORE);
+        SetForegroundWindow(g_hwnd);
+    }
+}
+
+// Mise à jour de l'infobulle du System Tray
+static void actualiser_tray_tooltip()
+{
+    if (g_in_tray)
+    {
+        snprintf(g_nid.szTip, sizeof(g_nid.szTip), "Protect & Perf - %02d : %02d : %02d", g_heures, g_minutes, g_secondes);
+        Shell_NotifyIconA(NIM_MODIFY, &g_nid);
+    }
+}
+#endif
 
 // Résolution portable des chemins d'accès aux assets
 static std::string get_asset_path(const char *name)
@@ -108,7 +216,7 @@ static void actualiser_affichage()
     }
     else
     {
-        // En pause : afficher l'icône lecture
+        // En pause : afficher l'icône lecture au centre
         if (g_play_surface)
         {
             SDL_Rect position;
@@ -152,7 +260,7 @@ static void tick_seconde()
         }
         else
         {
-            // Fin du compte à rebours : réinitialisation et arrêt du timer
+            // Fin du compte à rebours : arrêt du timer
             g_heures = 0;
             g_minutes = 0;
             g_secondes = 0;
@@ -165,6 +273,7 @@ static void tick_seconde()
 
             // Déclenchement de la mise en veille prolongée (comme dans le projet d'origine)
 #if defined(_WIN32)
+            restaurer_depuis_tray();
             system("shutdown /h");
 #else
             system("systemctl hibernate || shutdown -h now");
@@ -173,22 +282,27 @@ static void tick_seconde()
         }
     }
 
-    // Alerte automatique à moins de 5 minutes
+    // Alerte automatique à moins de 5 minutes restantes
     if (g_minutes <= 5 && g_heures <= 0 && g_only_one)
     {
 #if defined(_WIN32)
+        restaurer_depuis_tray();
         if (g_hwnd)
         {
             ShowWindow(g_hwnd, SW_RESTORE);
             RECT rect;
             SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
-            SetWindowPos(g_hwnd, HWND_TOPMOST, (rect.right - 250) / 2, (rect.bottom - 68) / 2, 250, 68, SWP_SHOWWINDOW);
+            SetWindowPos(g_hwnd, HWND_TOPMOST, (rect.right - FENETRE_L) / 2, (rect.bottom - (FENETRE_H + 28)) / 2, FENETRE_L, FENETRE_H + 28, SWP_SHOWWINDOW);
         }
 #endif
         g_only_one = false;
     }
 
     actualiser_affichage();
+
+#if defined(_WIN32)
+    actualiser_tray_tooltip();
+#endif
 }
 
 // Bascule Lecture / Pause
@@ -250,26 +364,30 @@ int main(int argc, char** argv)
     g_ecran = SDL_SetVideoMode(FENETRE_L, FENETRE_H, 16, SDL_HWSURFACE | SDL_DOUBLEBUF);
     if (!g_ecran)
     {
-        fprintf(stderr, "Impossible d'ouvrir la fenêtre SDL: %s\n", SDL_GetError());
+        fprintf(stderr, "Impossible d'ouvrir la fenetre SDL: %s\n", SDL_GetError());
         TTF_Quit();
         return EXIT_FAILURE;
     }
 
 #if defined(_WIN32)
     g_hwnd = GetActiveWindow();
+    if (g_hwnd)
+    {
+        g_old_wndproc = (WNDPROC)SetWindowLongPtrA(g_hwnd, GWLP_WNDPROC, (LONG_PTR)TraySubclassProc);
+    }
 #endif
 
     // Chargement de la police libre (Patrick Hand sous licence SIL OFL)
     std::string font_path = get_asset_path("PatrickHand-Regular.ttf");
-    g_police = TTF_OpenFont(font_path.c_str(), 32);
+    g_police = TTF_OpenFont(font_path.c_str(), 36);
     if (!g_police)
     {
-        fprintf(stderr, "Erreur chargement de la police '%s': %s\n", font_path.c_str(), TTF_GetError());
+        fprintf(stderr, "Erreur chargement police '%s': %s\n", font_path.c_str(), TTF_GetError());
         TTF_Quit();
         return EXIT_FAILURE;
     }
 
-    // Chargement de l'icône Play (libre de droits, BMP natif avec couleur clé)
+    // Chargement de l'icône Play
     std::string play_path = get_asset_path("play.bmp");
     g_play_surface = SDL_LoadBMP(play_path.c_str());
     if (g_play_surface)
@@ -305,11 +423,11 @@ int main(int argc, char** argv)
             case SDL_ACTIVEEVENT:
                 if ((event.active.state & SDL_APPACTIVE) == SDL_APPACTIVE)
                 {
-                    // Si réduite et moins de 5 min restantes, restaurer
-                    if (event.active.gain == 0 && g_minutes <= 5 && g_heures <= 0 && g_playing == 1)
+                    // Si minimisée : masquer et basculer dans le systray
+                    if (event.active.gain == 0 && g_playing == 1)
                     {
 #if defined(_WIN32)
-                        if (g_hwnd) ShowWindow(g_hwnd, SW_RESTORE);
+                        minimiser_vers_tray();
 #endif
                     }
                 }
@@ -322,6 +440,14 @@ int main(int argc, char** argv)
     }
 
     // Nettoyage des ressources
+#if defined(_WIN32)
+    restaurer_depuis_tray();
+    if (g_hwnd && g_old_wndproc)
+    {
+        SetWindowLongPtrA(g_hwnd, GWLP_WNDPROC, (LONG_PTR)g_old_wndproc);
+    }
+#endif
+
     if (g_timer)
     {
         SDL_RemoveTimer(g_timer);
@@ -356,4 +482,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     return main(__argc, __argv);
 }
 #endif
-

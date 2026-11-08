@@ -16,9 +16,14 @@ Un minuteur de session (2 heures) en C++ avec SDL 1.2 et SDL_ttf, initialement c
 
 ## ✨ Fonctionnalités remastérisées
 
+- **Titre de fenêtre lisible** : Dimensions de la fenêtre optimisées (360x60) pour assurer la visibilité complète du titre (« Protect & Perf - 2 Heures ») sans être masqué par les boutons de la barre de titre.
+- **Minimisation dans le System Tray** :
+  - Sous Windows, la minimisation masque la fenêtre et la loge discrètement dans la zone de notification (systray).
+  - L'infobulle affiche le compte à rebours restant en direct lors du survol.
+  - Menu contextuel (clic droit ou double-clic) pour restaurer, mettre en pause ou quitter.
 - **Décompte de 2 heures** : affichage grand format du temps restant (`Temps: 02 : 00 : 00`) en orange sur fond blanc avec centrage automatique.
 - **Pause / Reprise au clic** : un simple clic sur la fenêtre met le décompte en pause et affiche l'icône de lecture ; un second clic relance le chronomètre.
-- **Rappel de sécurité à 5 minutes** : lorsque moins de 5 minutes restent au chronomètre, la fenêtre se restaure automatiquement et se place au premier plan (`HWND_TOPMOST` sous Windows).
+- **Rappel de sécurité à 5 minutes** : lorsque moins de 5 minutes restent au chronomètre, la fenêtre se restaure automatiquement depuis le systray et se place au premier plan (`HWND_TOPMOST` sous Windows).
 - **Mise en veille prolongée automatique** : à la fin exacte des 2 heures de décompte, le minuteur déclenche automatiquement la mise en veille prolongée (`shutdown /h` sous Windows, `systemctl hibernate` sous Linux).
 - **Ressources 100 % libres de droits** :
   - Police manuscrite open-source **[Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand)** (SIL OFL 1.1).
