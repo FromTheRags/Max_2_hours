@@ -36,11 +36,17 @@ jobs:
 
       - name: Package Linux Artifact
         run: |
-          mkdir -p dist/max_2_hours-sdl3-linux
+          mkdir -p dist/max_2_hours-sdl3-linux/lib
           cp build/max_2_hours dist/max_2_hours-sdl3-linux/
           cp -r assets dist/max_2_hours-sdl3-linux/
           cp assets/*.bmp assets/*.ttf dist/max_2_hours-sdl3-linux/ || true
           cp LICENSE LICENSES.md OFL.txt README.md dist/max_2_hours-sdl3-linux/
+          # Copy bundled SDL3 and SDL3_ttf shared libraries (and symlinks) into package
+          cp -d "${{ steps.sdl.outputs.prefix }}"/lib/libSDL3*.so* dist/max_2_hours-sdl3-linux/lib/ 2>/dev/null || true
+          cp -d "${{ steps.sdl.outputs.prefix }}"/lib/libSDL3*.so* dist/max_2_hours-sdl3-linux/ 2>/dev/null || true
+          # Create launcher script
+          printf '#!/bin/sh\nDIR="$(cd "$(dirname "$0")" && pwd)"\nexport LD_LIBRARY_PATH="$DIR:$DIR/lib:$LD_LIBRARY_PATH"\nexec "$DIR/max_2_hours" "$@"\n' > dist/max_2_hours-sdl3-linux/max_2_hours.sh
+          chmod +x dist/max_2_hours-sdl3-linux/max_2_hours.sh dist/max_2_hours-sdl3-linux/max_2_hours
           cd dist && tar -czvf ../max_2_hours-sdl3-linux-x86_64.tar.gz max_2_hours-sdl3-linux
 
       - name: Upload Linux Build Artifact

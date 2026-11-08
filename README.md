@@ -36,6 +36,30 @@ Un minuteur de session (2 heures) en C++ avec SDL 3 et SDL3_ttf, initialement co
 
 ---
 
+## 🐧 Utilisation et prérequis sous Linux
+
+### Exécution de l'archive portable (Release)
+L'archive Linux fournie dans les releases contient l'exécutable ainsi que les bibliothèques partagées `libSDL3.so.0` et `libSDL3_ttf.so.0` configurées avec RPATH relatif (`$ORIGIN` et `$ORIGIN/lib`) :
+
+```bash
+# Extraction de l'archive
+tar -xzvf max_2_hours-sdl3-linux-x86_64.tar.gz
+cd max_2_hours-sdl3-linux
+
+# Lancement
+./max_2_hours
+# ou via le script lanceur :
+./max_2_hours.sh
+```
+
+### Dépendances système requises
+L'application s'appuie sur la pile standard de polices et d'affichage de votre bureau Linux :
+- **Ubuntu / Debian** : `sudo apt update && sudo apt install -y libfreetype6 fontconfig`
+- **Fedora** : `sudo dnf install -y freetype fontconfig`
+- **Arch Linux** : `sudo pacman -S freetype2 fontconfig`
+
+---
+
 ## 🛠️ Compilation avec CMake
 
 ### Prérequis

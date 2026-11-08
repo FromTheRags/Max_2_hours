@@ -115,6 +115,13 @@ target_link_libraries(max_2_hours PRIVATE
     SDL3_ttf::SDL3_ttf
 )
 
+if(UNIX AND NOT APPLE)
+    set_target_properties(max_2_hours PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "\$ORIGIN:\$ORIGIN/lib"
+    )
+endif()
+
 if(WIN32 AND MINGW)
     target_link_options(max_2_hours PRIVATE -mwindows)
 endif()
