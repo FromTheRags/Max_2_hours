@@ -32,6 +32,31 @@ Un minuteur de session (2 heures) en C++ avec SDL 1.2 et SDL_ttf, initialement c
 - **Ressources 100 % libres de droits** :
   - Police manuscrite open-source **[Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand)** (SIL OFL 1.1).
   - Graphismes originaux dédiés au domaine public (**CC0 1.0**).
+
+---
+
+## 🐧 Utilisation et prérequis sous Linux
+
+### Exécution de l'archive portable (Release)
+L'archive Linux fournie dans les releases contient l'exécutable ainsi que les bibliothèques partagées `libSDL-1.2.so.0` et `libSDL_ttf-2.0.so.0` configurées avec RPATH relatif (`$ORIGIN` et `$ORIGIN/lib`) :
+
+```bash
+# Extraction de l'archive
+tar -xzvf max_2_hours-linux-x86_64.tar.gz
+cd max_2_hours-linux
+
+# Lancement
+./max_2_hours
+# ou via le script lanceur :
+./max_2_hours.sh
+```
+
+### Dépendances système recommandées
+Si vous n'utilisez pas les bibliothèques embarquées ou sur une distribution minimale :
+- **Ubuntu / Debian** : `sudo apt update && sudo apt install -y libsdl1.2debian libsdl-ttf2.0-0 libfreetype6 fontconfig`
+- **Fedora** : `sudo dnf install -y SDL SDL_ttf freetype fontconfig`
+- **Arch Linux** : `sudo pacman -S sdl12-compat sdl_ttf freetype2 fontconfig`
+
 ---
 
 ## 🛠️ Compilation avec CMake

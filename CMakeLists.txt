@@ -108,6 +108,13 @@ target_link_libraries(max_2_hours PRIVATE
     ${SDL_TTF_LIBRARY}
 )
 
+if(UNIX AND NOT APPLE)
+    set_target_properties(max_2_hours PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "\$ORIGIN:\$ORIGIN/lib"
+    )
+endif()
+
 if(WIN32)
     if(MSVC)
         find_library(LEGACY_STDIO_LIB legacy_stdio_definitions)

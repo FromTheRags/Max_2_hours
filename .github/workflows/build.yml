@@ -28,11 +28,19 @@ jobs:
 
       - name: Package Linux Artifact
         run: |
-          mkdir -p dist/max_2_hours-linux
+          mkdir -p dist/max_2_hours-linux/lib
           cp build/max_2_hours dist/max_2_hours-linux/
           cp -r assets dist/max_2_hours-linux/
           cp assets/*.bmp assets/*.ttf dist/max_2_hours-linux/ || true
           cp LICENSE LICENSES.md OFL.txt README.md dist/max_2_hours-linux/
+          # Copy system SDL 1.2 and SDL_ttf shared libraries into package
+          cp -d /usr/lib/x86_64-linux-gnu/libSDL-1.2*.so* dist/max_2_hours-linux/lib/ 2>/dev/null || true
+          cp -d /usr/lib/x86_64-linux-gnu/libSDL_ttf-2.0*.so* dist/max_2_hours-linux/lib/ 2>/dev/null || true
+          cp -d /usr/lib/x86_64-linux-gnu/libSDL-1.2*.so* dist/max_2_hours-linux/ 2>/dev/null || true
+          cp -d /usr/lib/x86_64-linux-gnu/libSDL_ttf-2.0*.so* dist/max_2_hours-linux/ 2>/dev/null || true
+          # Create launcher script
+          printf '#!/bin/sh\nDIR="$(cd "$(dirname "$0")" && pwd)"\nexport LD_LIBRARY_PATH="$DIR:$DIR/lib:$LD_LIBRARY_PATH"\nexec "$DIR/max_2_hours" "$@"\n' > dist/max_2_hours-linux/max_2_hours.sh
+          chmod +x dist/max_2_hours-linux/max_2_hours.sh dist/max_2_hours-linux/max_2_hours
           cd dist && tar -czvf ../max_2_hours-linux-x86_64.tar.gz max_2_hours-linux
 
       - name: Upload Linux Build Artifact
