@@ -1,31 +1,38 @@
-# Max_2_hours (Protect & Perf) - Minuteur SDL 1.2
+# Max_2_hours (Protect & Perf) - Minuteur SDL 1.2 Remastérisé
 
+[![Build & Package](https://github.com/FromTheRags/Max_2_hours/actions/workflows/build.yml/badge.svg)](https://github.com/FromTheRags/Max_2_hours/actions/workflows/build.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Library: SDL 1.2](https://img.shields.io/badge/Library-SDL%201.2-green.svg)](https://www.libsdl.org/)
 [![CMake](https://img.shields.io/badge/Build-CMake-064F8C.svg?logo=cmake&logoColor=white)](https://cmake.org/)
 
+> [!NOTE]
+> 🚀 **Vous recherchez une version moderne ?** Découvrez la branche [`SDL_3`](https://github.com/FromTheRags/Max_2_hours/tree/SDL_3) !
+> Cette branche `main` préserve et remastérise le code d'origine de 2013 sous **SDL 1.2**, tandis que la branche [`SDL_3`](https://github.com/FromTheRags/Max_2_hours/tree/SDL_3) propose une implémentation native sous **SDL 3 & SDL3_ttf** avec accélération matérielle GPU et intégration multiplateforme moderne.
+
 Un minuteur de session (2 heures) en C++ avec SDL 1.2 et SDL_ttf, initialement conçu pour limiter le temps d'écran et prévenir la fatigue visuelle.
-Ce projet d'archive a été nettoyé et mis en conformité **libre de droits** (GPLv3, SIL OFL 1.1 et CC0 1.0) avec une chaîne de compilation moderne CMake.
+**Le code a été entièrement remastérisé** : nettoyage des scripts obsolètes, portabilité multiplateforme C++17, assets 100 % libres de droits (GPLv3, SIL OFL 1.1 et CC0 1.0) et automatisation CI/CD moderne avec CMake.
 
 ---
 
-## Fonctionnalités
+## ✨ Fonctionnalités remastérisées
 
-- **Décompte de 2 heures** : affichage grand format du temps restant (`Temps: 02 : 00 : 00`) en orange sur fond blanc.
+- **Décompte de 2 heures** : affichage grand format du temps restant (`Temps: 02 : 00 : 00`) en orange sur fond blanc avec centrage automatique.
 - **Pause / Reprise au clic** : un simple clic sur la fenêtre met le décompte en pause et affiche l'icône de lecture ; un second clic relance le chronomètre.
-- **Rappel de sécurité à 5 minutes** : lorsque moins de 5 minutes restent au chronomètre, la fenêtre se restaure et se place au premier plan (`HWND_TOPMOST` sous Windows).
+- **Rappel de sécurité à 5 minutes** : lorsque moins de 5 minutes restent au chronomètre, la fenêtre se restaure automatiquement et se place au premier plan (`HWND_TOPMOST` sous Windows).
+- **Mise en veille prolongée automatique** : à la fin exacte des 2 heures de décompte, le minuteur déclenche automatiquement la mise en veille prolongée (`shutdown /h` sous Windows, `systemctl hibernate` sous Linux).
 - **Ressources 100 % libres de droits** :
-  - Police manuscrite open-source **Patrick Hand** (SIL OFL 1.1).
-  - Graphismes originaux dédiés au domaine public (CC0 1.0).
+  - Police manuscrite open-source **[Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand)** (SIL OFL 1.1).
+  - Graphismes originaux dédiés au domaine public (**CC0 1.0**).
+  - Suppression de la dépendance à SDL_image (rendu BMP natif avec couleur-clé).
 
 ---
 
-## Compilation avec CMake
+## 🛠️ Compilation avec CMake
 
 ### Prérequis
 - CMake 3.16 ou supérieur
 - Un compilateur C/C++ supportant C++17 (MSVC, MinGW GCC, Clang)
-- SDL 1.2 et SDL_ttf (fournis dans `cmake/sdl12` pour Windows)
+- SDL 1.2 et SDL_ttf (fournis dans `cmake/sdl12` pour Windows, ou paquets système Linux/macOS)
 
 ### Instructions de compilation
 
@@ -37,11 +44,19 @@ cmake -B build
 cmake --build build
 ```
 
-L'exécutable `max_2_hours.exe` est généré dans le répertoire `build/`, accompagné de l'ensemble de ses dépendances d'exécution (DLLs SDL 1.2 et répertoire `assets/`).
+L'exécutable `max_2_hours` (ou `max_2_hours.exe`) est généré dans le répertoire `build/`, accompagné de l'ensemble de ses dépendances d'exécution (DLLs SDL 1.2 et répertoire `assets/`).
 
 ---
 
-## Licences
+## 🤖 CI/CD Automatisée
+
+Le projet intègre une pipeline GitHub Actions (`.github/workflows/build.yml`) assurant à chaque push et pull request :
+- Compilation sous **Ubuntu Linux** (`gcc`, `ninja`, paquets système SDL 1.2 et SDL_ttf) et archivage en `.tar.gz`.
+- Compilation sous **Windows** (`MinGW-w64`, `ninja`, `SDL`, `SDL_ttf`) avec empaquetage autonome portable en `.zip` incluant les DLL nécessaires.
+
+---
+
+## 📄 Licences
 
 - Code source : **GNU GPL v3.0** ([LICENSE](LICENSE))
 - Typographie : **SIL Open Font License 1.1** ([OFL.txt](OFL.txt))

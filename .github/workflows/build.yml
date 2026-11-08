@@ -1,0 +1,85 @@
+name: Build & Package
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build-linux:
+    name: Linux (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SDL 1.2 & SDL_ttf dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl1.2-dev libsdl-ttf2.0-dev cmake ninja-build
+
+      - name: Configure CMake
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build project
+        run: cmake --build build --config Release
+
+      - name: Package Linux Artifact
+        run: |
+          mkdir -p dist/max_2_hours-linux
+          cp build/max_2_hours dist/max_2_hours-linux/
+          cp -r assets dist/max_2_hours-linux/
+          cp assets/*.bmp assets/*.ttf dist/max_2_hours-linux/ || true
+          cp LICENSE OFL.txt README.md dist/max_2_hours-linux/
+          cd dist && tar -czvf ../max_2_hours-linux-x86_64.tar.gz max_2_hours-linux
+
+      - name: Upload Linux Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: max_2_hours-linux-x86_64
+          path: max_2_hours-linux-x86_64.tar.gz
+
+  build-windows:
+    name: Windows (MinGW-w64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 MinGW-w64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-SDL
+            mingw-w64-x86_64-SDL_ttf
+
+      - name: Configure CMake
+        shell: msys2 {0}
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build project
+        shell: msys2 {0}
+        run: cmake --build build --config Release
+
+      - name: Package Windows Portable Zip
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist/max_2_hours-windows
+          cp build/max_2_hours.exe dist/max_2_hours-windows/
+          cp -r assets dist/max_2_hours-windows/
+          cp assets/*.bmp assets/*.ttf dist/max_2_hours-windows/ || true
+          cp LICENSE OFL.txt README.md dist/max_2_hours-windows/
+          cmake -DEXECUTABLE="$PWD/build/max_2_hours.exe" -DDESTINATION="$PWD/dist/max_2_hours-windows" -DMINGW_BIN_DIR=/mingw64/bin -P cmake/CopyRuntimeDependencies.cmake
+          cd dist && cmake -E tar cf ../max_2_hours-windows-x64.zip --format=zip max_2_hours-windows
+
+      - name: Upload Windows Portable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: max_2_hours-windows-x64
+          path: max_2_hours-windows-x64.zip
