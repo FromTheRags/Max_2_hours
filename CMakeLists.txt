@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(max_2_hours LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,68 +11,77 @@ else()
     set(ARCH_DIR "x86")
 endif()
 
-set(SDL12_VENDOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdl12")
-
-# 1. Try finding system SDL 1.2
-find_package(SDL QUIET)
-
-# 2. Try finding system SDL_ttf
-find_path(SDL_TTF_INCLUDE_DIR NAMES SDL_ttf.h
-    PATH_SUFFIXES SDL include/SDL include
-    PATHS
-        ${SDL_INCLUDE_DIR}
-        /usr/include/SDL
-        /usr/local/include/SDL
-        /opt/homebrew/include/SDL
-        /opt/local/include/SDL
-)
-
-find_library(SDL_TTF_LIBRARY
-    NAMES SDL_ttf SDL_ttf-static
-    PATH_SUFFIXES lib
-    PATHS
-        /usr/lib
-        /usr/local/lib
-        /opt/homebrew/lib
-        /opt/local/lib
-)
-
-# 3. Automatic fallback on Windows (CLion / Visual Studio / MinGW) using bundled cmake/sdl12
-if(WIN32)
-    if(NOT SDL_FOUND OR NOT SDL_INCLUDE_DIR OR NOT SDL_LIBRARY)
-        set(SDL_INCLUDE_DIR "${SDL12_VENDOR_DIR}/include/SDL" CACHE PATH "SDL Include Dir" FORCE)
-        find_library(SDL_LIBRARY_BUNDLED NAMES SDL PATHS "${SDL12_VENDOR_DIR}/lib/${ARCH_DIR}" NO_DEFAULT_PATH)
-        set(SDL_LIBRARY "${SDL_LIBRARY_BUNDLED}" CACHE FILEPATH "SDL Library" FORCE)
-        set(SDL_FOUND TRUE)
-    endif()
-
-    if(NOT SDL_TTF_INCLUDE_DIR)
-        set(SDL_TTF_INCLUDE_DIR "${SDL12_VENDOR_DIR}/include/SDL" CACHE PATH "SDL TTF Include Dir" FORCE)
-    endif()
-
-    if(NOT SDL_TTF_LIBRARY)
-        find_library(SDL_TTF_LIBRARY_BUNDLED NAMES SDL_ttf PATHS "${SDL12_VENDOR_DIR}/lib/${ARCH_DIR}" NO_DEFAULT_PATH)
-        set(SDL_TTF_LIBRARY "${SDL_TTF_LIBRARY_BUNDLED}" CACHE FILEPATH "SDL TTF Library" FORCE)
-    endif()
+# Check bundled cmake/sdl3 vendor directories first on Windows
+set(SDL3_VENDOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdl3")
+if(EXISTS "${SDL3_VENDOR_DIR}/SDL3")
+    list(APPEND CMAKE_PREFIX_PATH "${SDL3_VENDOR_DIR}/SDL3" "${SDL3_VENDOR_DIR}/SDL3_ttf")
 endif()
 
-if(NOT SDL_TTF_INCLUDE_DIR OR NOT SDL_TTF_LIBRARY)
+# Try finding system / vendor SDL3 and SDL3_ttf
+find_package(SDL3 CONFIG QUIET)
+find_package(SDL3_ttf CONFIG QUIET)
+
+# If not found via CONFIG, try find_package without CONFIG (e.g. FindPkgConfig)
+if(NOT SDL3_FOUND OR NOT SDL3_ttf_FOUND)
     find_package(PkgConfig QUIET)
     if(PKG_CONFIG_FOUND)
-        pkg_check_modules(PKG_SDL_TTF QUIET SDL_ttf)
-        if(PKG_SDL_TTF_FOUND)
-            set(SDL_TTF_INCLUDE_DIR ${PKG_SDL_TTF_INCLUDE_DIRS})
-            set(SDL_TTF_LIBRARY ${PKG_SDL_TTF_LIBRARIES})
+        if(NOT SDL3_FOUND)
+            pkg_check_modules(PKG_SDL3 QUIET sdl3)
+            if(PKG_SDL3_FOUND)
+                find_package(SDL3 QUIET)
+            endif()
+        endif()
+        if(NOT SDL3_ttf_FOUND)
+            pkg_check_modules(PKG_SDL3_TTF QUIET sdl3-ttf)
+            if(PKG_SDL3_TTF_FOUND)
+                find_package(SDL3_ttf QUIET)
+            endif()
         endif()
     endif()
 endif()
 
-if(NOT SDL_FOUND OR NOT SDL_LIBRARY)
-    message(FATAL_ERROR "SDL 1.2 library not found. Please install libsdl1.2-dev or equivalent.")
+# Fallback on Windows: download official release VC zip via FetchContent if still not found
+if(WIN32 AND (NOT SDL3_FOUND OR NOT SDL3_ttf_FOUND))
+    include(FetchContent)
+    if(NOT SDL3_FOUND)
+        FetchContent_Declare(
+            SDL3_prebuilt
+            URL "https://github.com/libsdl-org/SDL/releases/download/release-3.2.0/SDL3-devel-3.2.0-VC.zip"
+        )
+        FetchContent_MakeAvailable(SDL3_prebuilt)
+        list(APPEND CMAKE_PREFIX_PATH "${sdl3_prebuilt_SOURCE_DIR}")
+        find_package(SDL3 CONFIG REQUIRED)
+    endif()
+    if(NOT SDL3_ttf_FOUND)
+        FetchContent_Declare(
+            SDL3_ttf_prebuilt
+            URL "https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-devel-3.2.2-VC.zip"
+        )
+        FetchContent_MakeAvailable(SDL3_ttf_prebuilt)
+        list(APPEND CMAKE_PREFIX_PATH "${sdl3_ttf_prebuilt_SOURCE_DIR}")
+        find_package(SDL3_ttf CONFIG REQUIRED)
+    endif()
 endif()
 
-if(NOT SDL_TTF_LIBRARY)
-    message(FATAL_ERROR "SDL_ttf library not found. Please install libsdl-ttf2.0-dev or equivalent.")
+# Fallback on Linux if still not found: FetchContent build from source
+if(NOT SDL3_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        SDL3
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG release-3.2.0
+    )
+    FetchContent_MakeAvailable(SDL3)
+endif()
+
+if(NOT SDL3_ttf_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        SDL3_ttf
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+        GIT_TAG release-3.2.2
+    )
+    FetchContent_MakeAvailable(SDL3_ttf)
 endif()
 
 # Source files
@@ -91,31 +100,16 @@ endif()
 add_executable(max_2_hours ${SOURCES})
 
 target_include_directories(max_2_hours PRIVATE
-    ${SDL_INCLUDE_DIR}
-    ${SDL_TTF_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(max_2_hours PRIVATE
-    ${SDL_LIBRARY}
-    ${SDL_TTF_LIBRARY}
+    SDL3::SDL3
+    SDL3_ttf::SDL3_ttf
 )
 
-if(WIN32)
-    if(MSVC)
-        find_library(LEGACY_STDIO_LIB legacy_stdio_definitions)
-        if(LEGACY_STDIO_LIB)
-            target_link_libraries(max_2_hours PRIVATE ${LEGACY_STDIO_LIB})
-        endif()
-        find_library(SDLMAIN_LIBRARY NAMES SDLmain PATHS "${SDL12_VENDOR_DIR}/lib/${ARCH_DIR}" ${SDL_INCLUDE_DIR}/../lib)
-        if(SDLMAIN_LIBRARY)
-            target_link_libraries(max_2_hours PRIVATE ${SDLMAIN_LIBRARY})
-        endif()
-    endif()
-    if(MINGW)
-        target_link_libraries(max_2_hours PRIVATE mingw32)
-        target_link_options(max_2_hours PRIVATE -mwindows)
-    endif()
+if(WIN32 AND MINGW)
+    target_link_options(max_2_hours PRIVATE -mwindows)
 endif()
 
 # Copy assets to output directory
@@ -125,28 +119,29 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/assets"
             "$<TARGET_FILE_DIR:max_2_hours>/assets"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-            "$<TARGET_FILE_DIR:max_2_hours>"
-        COMMENT "Copying assets directory and files to output"
+        COMMENT "Copying assets directory to output"
     )
 endif()
 
-# On Windows, also copy bundled DLLs next to the executable
-if(WIN32 AND EXISTS "${SDL12_VENDOR_DIR}/lib/${ARCH_DIR}")
-    file(GLOB BUNDLED_DLLS CONFIGURE_DEPENDS "${SDL12_VENDOR_DIR}/lib/${ARCH_DIR}/*.dll")
-    foreach(DLL_FILE ${BUNDLED_DLLS})
-        add_custom_command(
-            TARGET max_2_hours POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${DLL_FILE}"
-                "$<TARGET_FILE_DIR:max_2_hours>/"
-            COMMENT "Copying runtime DLL ${DLL_FILE}"
+# On Windows, copy runtime DLLs next to the executable
+if(WIN32)
+    if(EXISTS "${SDL3_VENDOR_DIR}/SDL3/lib/${ARCH_DIR}")
+        file(GLOB BUNDLED_DLLS CONFIGURE_DEPENDS
+            "${SDL3_VENDOR_DIR}/SDL3/lib/${ARCH_DIR}/*.dll"
+            "${SDL3_VENDOR_DIR}/SDL3_ttf/lib/${ARCH_DIR}/*.dll"
         )
-    endforeach()
+        foreach(DLL_FILE ${BUNDLED_DLLS})
+            add_custom_command(
+                TARGET max_2_hours POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${DLL_FILE}"
+                    "$<TARGET_FILE_DIR:max_2_hours>/"
+                COMMENT "Copying runtime DLL ${DLL_FILE}"
+            )
+        endforeach()
+    endif()
 endif()
 
 # Install rules
 install(TARGETS max_2_hours DESTINATION bin)
-install(DIRECTORY assets/ DESTINATION bin/assets)
-install(DIRECTORY assets/ DESTINATION bin)
+install(DIRECTORY assets DESTINATION bin)
