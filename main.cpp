@@ -48,8 +48,14 @@ extern "C" {
 
 // Titre court et dimensions adaptées pour une visibilité parfaite du titre
 const char *TITRE_APPLICATION = "Protect & Perf";
-const int FENETRE_L = 360;
+const int FENETRE_L = 380;
 const int FENETRE_H = 60;
+
+// Dimensions et position des boutons - et +
+const int BTN_TAILLE = 32;
+const int BTN_Y = (FENETRE_H - BTN_TAILLE) / 2;
+const int BTN_MINUS_X = 12;
+const int BTN_PLUS_X = FENETRE_L - 12 - BTN_TAILLE;
 
 // Variables globales d'état
 static SDL_Surface *g_ecran = NULL;
@@ -65,6 +71,8 @@ static int g_secondes = 0;
 static int g_playing = 1;
 static bool g_only_one = true;
 static Uint32 g_last_restore_time = 0;
+static bool g_hover_minus = false;
+static bool g_hover_plus = false;
 
 static const SDL_Color g_couleur_orange = {255, 123, 0, 0};
 
@@ -72,12 +80,15 @@ static const SDL_Color g_couleur_orange = {255, 123, 0, 0};
 static void basculer_pause();
 static void actualiser_affichage();
 static void actualiser_tray();
+static void ajuster_temps(int delta_secondes);
 
 #if defined(_WIN32)
 #define WM_TRAYICON (WM_USER + 1)
-#define ID_TRAY_RESTAURER 1001
-#define ID_TRAY_PAUSE     1002
-#define ID_TRAY_QUITTER   1003
+#define ID_TRAY_RESTAURER   1001
+#define ID_TRAY_PAUSE       1002
+#define ID_TRAY_AJOUTER_5M  1004
+#define ID_TRAY_RETIRER_5M  1005
+#define ID_TRAY_QUITTER     1003
 
 static HWND g_hwnd = NULL;
 static NOTIFYICONDATAA g_nid;
@@ -106,6 +117,9 @@ static LRESULT CALLBACK TraySubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
             AppendMenuA(hMenu, MF_STRING, ID_TRAY_RESTAURER, "Afficher la fenetre");
             AppendMenuA(hMenu, MF_STRING, ID_TRAY_PAUSE, (g_playing == 1) ? "Pause" : "Reprendre");
             AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenuA(hMenu, MF_STRING, ID_TRAY_AJOUTER_5M, "+5 minutes");
+            AppendMenuA(hMenu, MF_STRING, ID_TRAY_RETIRER_5M, "-5 minutes");
+            AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
             AppendMenuA(hMenu, MF_STRING, ID_TRAY_QUITTER, "Quitter");
 
             SetForegroundWindow(hwnd);
@@ -119,6 +133,14 @@ static LRESULT CALLBACK TraySubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
             else if (cmd == ID_TRAY_PAUSE)
             {
                 basculer_pause();
+            }
+            else if (cmd == ID_TRAY_AJOUTER_5M)
+            {
+                ajuster_temps(300);
+            }
+            else if (cmd == ID_TRAY_RETIRER_5M)
+            {
+                ajuster_temps(-300);
             }
             else if (cmd == ID_TRAY_QUITTER)
             {
@@ -207,6 +229,87 @@ static std::string get_asset_path(const char *name)
     return std::string(name);
 }
 
+// Ajustement de la durée restante
+static void ajuster_temps(int delta_secondes)
+{
+    int total = g_heures * 3600 + g_minutes * 60 + g_secondes;
+    total += delta_secondes;
+
+    // Minimum 1 minute (60s) pour éviter l'extinction immédiate
+    if (total < 60)
+    {
+        total = 60;
+    }
+    // Maximum 24 heures (86400s)
+    if (total > 86400)
+    {
+        total = 86400;
+    }
+
+    g_heures = total / 3600;
+    g_minutes = (total % 3600) / 60;
+    g_secondes = total % 60;
+
+    // Réinitialisation de l'alerte des 5 minutes si on repasse au-dessus
+    if (total > 300)
+    {
+        g_only_one = true;
+    }
+
+    actualiser_affichage();
+#if defined(_WIN32)
+    actualiser_tray();
+#endif
+}
+
+// Dessin vectoriel épuré des boutons - et +
+static void dessiner_bouton(SDL_Surface *surface, int x, int y, int taille, bool est_plus, bool hover)
+{
+    SDL_Rect r_bg = { (Sint16)x, (Sint16)y, (Uint16)taille, (Uint16)taille };
+    Uint32 col_bg = hover ? SDL_MapRGB(surface->format, 255, 123, 0)
+                          : SDL_MapRGB(surface->format, 246, 246, 248);
+    Uint32 col_bordure = hover ? SDL_MapRGB(surface->format, 220, 95, 0)
+                               : SDL_MapRGB(surface->format, 215, 215, 220);
+    Uint32 col_symbole = hover ? SDL_MapRGB(surface->format, 255, 255, 255)
+                               : SDL_MapRGB(surface->format, 255, 123, 0);
+
+    // Remplissage fond
+    SDL_FillRect(surface, &r_bg, col_bg);
+
+    // Bordure 1px
+    SDL_Rect bord_h = { (Sint16)x, (Sint16)y, (Uint16)taille, 1 };
+    SDL_Rect bord_b = { (Sint16)x, (Sint16)(y + taille - 1), (Uint16)taille, 1 };
+    SDL_Rect bord_g = { (Sint16)x, (Sint16)y, 1, (Uint16)taille };
+    SDL_Rect bord_d = { (Sint16)(x + taille - 1), (Sint16)y, 1, (Uint16)taille };
+    SDL_FillRect(surface, &bord_h, col_bordure);
+    SDL_FillRect(surface, &bord_b, col_bordure);
+    SDL_FillRect(surface, &bord_g, col_bordure);
+    SDL_FillRect(surface, &bord_d, col_bordure);
+
+    // Barre horizontale (- ou +)
+    int barre_w = 14;
+    int barre_h = 3;
+    SDL_Rect r_h = {
+        (Sint16)(x + (taille - barre_w) / 2),
+        (Sint16)(y + (taille - barre_h) / 2),
+        (Uint16)barre_w,
+        (Uint16)barre_h
+    };
+    SDL_FillRect(surface, &r_h, col_symbole);
+
+    // Barre verticale pour +
+    if (est_plus)
+    {
+        SDL_Rect r_v = {
+            (Sint16)(x + (taille - barre_h) / 2),
+            (Sint16)(y + (taille - barre_w) / 2),
+            (Uint16)barre_h,
+            (Uint16)barre_w
+        };
+        SDL_FillRect(surface, &r_v, col_symbole);
+    }
+}
+
 // Rafraîchissement de l'affichage
 static void actualiser_affichage()
 {
@@ -214,6 +317,10 @@ static void actualiser_affichage()
 
     // Fond blanc
     SDL_FillRect(g_ecran, NULL, SDL_MapRGB(g_ecran->format, 255, 255, 255));
+
+    // Dessin des boutons - et +
+    dessiner_bouton(g_ecran, BTN_MINUS_X, BTN_Y, BTN_TAILLE, false, g_hover_minus);
+    dessiner_bouton(g_ecran, BTN_PLUS_X, BTN_Y, BTN_TAILLE, true, g_hover_plus);
 
     if (g_playing)
     {
@@ -235,13 +342,37 @@ static void actualiser_affichage()
     }
     else
     {
-        // En pause : afficher l'icône lecture au centre
-        if (g_play_surface)
+        // En pause : afficher l'icône de reprise et le temps actuel
+        if (g_police)
         {
-            SDL_Rect position;
-            position.x = (g_ecran->w - g_play_surface->w) / 2;
-            position.y = (g_ecran->h - g_play_surface->h) / 2;
-            SDL_BlitSurface(g_play_surface, NULL, g_ecran, &position);
+            char temps[64] = {0};
+            snprintf(temps, sizeof(temps), "%02d : %02d : %02d", g_heures, g_minutes, g_secondes);
+            SDL_Surface *texte = TTF_RenderText_Blended(g_police, temps, g_couleur_orange);
+
+            int play_w = g_play_surface ? g_play_surface->w : 0;
+            int play_h = g_play_surface ? g_play_surface->h : 0;
+            int txt_w = texte ? texte->w : 0;
+            int txt_h = texte ? texte->h : 0;
+            int espacement = 12;
+            int total_w = play_w + (play_w && txt_w ? espacement : 0) + txt_w;
+            int start_x = (g_ecran->w - total_w) / 2;
+
+            if (g_play_surface)
+            {
+                SDL_Rect pos_play;
+                pos_play.x = start_x;
+                pos_play.y = (g_ecran->h - play_h) / 2;
+                SDL_BlitSurface(g_play_surface, NULL, g_ecran, &pos_play);
+            }
+
+            if (texte)
+            {
+                SDL_Rect pos_txt;
+                pos_txt.x = start_x + (play_w ? play_w + espacement : 0);
+                pos_txt.y = (g_ecran->h - txt_h) / 2;
+                SDL_BlitSurface(texte, NULL, g_ecran, &pos_txt);
+                SDL_FreeSurface(texte);
+            }
         }
     }
 
@@ -422,7 +553,7 @@ int main(int argc, char** argv)
 
     // Chargement de la police libre (Patrick Hand sous licence SIL OFL)
     std::string font_path = get_asset_path("PatrickHand-Regular.ttf");
-    g_police = TTF_OpenFont(font_path.c_str(), 36);
+    g_police = TTF_OpenFont(font_path.c_str(), 32);
     if (!g_police)
     {
         fprintf(stderr, "Erreur chargement police '%s': %s\n", font_path.c_str(), TTF_GetError());
@@ -459,9 +590,55 @@ int main(int argc, char** argv)
                 tick_seconde();
                 break;
 
-            case SDL_MOUSEBUTTONUP:
-                basculer_pause();
+            case SDL_MOUSEMOTION:
+            {
+                int mx = event.motion.x;
+                int my = event.motion.y;
+                bool hm = (mx >= BTN_MINUS_X && mx < BTN_MINUS_X + BTN_TAILLE && my >= BTN_Y && my < BTN_Y + BTN_TAILLE);
+                bool hp = (mx >= BTN_PLUS_X && mx < BTN_PLUS_X + BTN_TAILLE && my >= BTN_Y && my < BTN_Y + BTN_TAILLE);
+                if (hm != g_hover_minus || hp != g_hover_plus)
+                {
+                    g_hover_minus = hm;
+                    g_hover_plus = hp;
+                    actualiser_affichage();
+                }
                 break;
+            }
+
+            case SDL_MOUSEBUTTONUP:
+            {
+                int bx = event.button.x;
+                int by = event.button.y;
+                Uint8 btn = event.button.button;
+                SDLMod mod = SDL_GetModState();
+
+                if (btn == SDL_BUTTON_WHEELUP)
+                {
+                    ajuster_temps((mod & KMOD_SHIFT) ? 300 : 60);
+                }
+                else if (btn == SDL_BUTTON_WHEELDOWN)
+                {
+                    ajuster_temps((mod & KMOD_SHIFT) ? -300 : -60);
+                }
+                else if (bx >= BTN_MINUS_X && bx < BTN_MINUS_X + BTN_TAILLE && by >= BTN_Y && by < BTN_Y + BTN_TAILLE)
+                {
+                    // Clic sur bouton - : -5min par défaut, -1min si clic droit ou Shift, -15min si Ctrl
+                    int delta = (btn == SDL_BUTTON_RIGHT || (mod & KMOD_SHIFT)) ? -60 : ((mod & KMOD_CTRL) ? -900 : -300);
+                    ajuster_temps(delta);
+                }
+                else if (bx >= BTN_PLUS_X && bx < BTN_PLUS_X + BTN_TAILLE && by >= BTN_Y && by < BTN_Y + BTN_TAILLE)
+                {
+                    // Clic sur bouton + : +5min par défaut, +1min si clic droit ou Shift, +15min si Ctrl
+                    int delta = (btn == SDL_BUTTON_RIGHT || (mod & KMOD_SHIFT)) ? 60 : ((mod & KMOD_CTRL) ? 900 : 300);
+                    ajuster_temps(delta);
+                }
+                else if (btn == SDL_BUTTON_LEFT)
+                {
+                    // Clic en zone centrale : basculer pause/lecture
+                    basculer_pause();
+                }
+                break;
+            }
 
             case SDL_ACTIVEEVENT:
                 if ((event.active.state & SDL_APPACTIVE) == SDL_APPACTIVE)
