@@ -76,7 +76,13 @@ if(NOT SDL_TTF_LIBRARY)
 endif()
 
 # Source files
-set(SOURCES main.cpp)
+set(SOURCES
+    src/main.cpp
+    src/common.cpp
+    src/timer.cpp
+    src/ui.cpp
+    src/systray.cpp
+)
 
 # Windows icon resource
 if(WIN32)
@@ -93,6 +99,7 @@ add_executable(max_2_hours ${SOURCES})
 target_include_directories(max_2_hours PRIVATE
     ${SDL_INCLUDE_DIR}
     ${SDL_TTF_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
