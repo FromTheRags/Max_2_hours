@@ -1,19 +1,33 @@
-if(NOT DEFINED EXECUTABLE OR NOT DEFINED DESTINATION OR NOT DEFINED MINGW_BIN_DIR)
-    message(FATAL_ERROR "EXECUTABLE, DESTINATION, and MINGW_BIN_DIR must be set.")
+cmake_policy(SET CMP0207 NEW)
+
+if(NOT DEFINED EXECUTABLE OR NOT DEFINED DESTINATION)
+    message(FATAL_ERROR "EXECUTABLE and DESTINATION must be set.")
+endif()
+
+if(DEFINED MINGW_BIN_DIR)
+    set(DIRS "${MINGW_BIN_DIR}")
+else()
+    set(DIRS "")
 endif()
 
 file(GET_RUNTIME_DEPENDENCIES
     EXECUTABLES "${EXECUTABLE}"
-    DIRECTORIES "${MINGW_BIN_DIR}"
+    DIRECTORIES ${DIRS}
     RESOLVED_DEPENDENCIES_VAR RUNTIME_DEPENDENCIES
     UNRESOLVED_DEPENDENCIES_VAR UNRESOLVED_DEPENDENCIES
-    POST_EXCLUDE_REGEXES ".*[/\\\\][Ww]indows[/\\\\][Ss]ystem32[/\\\\].*"
+    PRE_EXCLUDE_REGEXES
+        "^api-ms-.*"
+        "^ext-ms-.*"
+        "^ieshims\\.dll"
+        "^emclient\\.dll"
+        "^devobj\\.dll"
+    POST_EXCLUDE_REGEXES
+        ".*[/\\\\][Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\\\].*"
 )
 
-if(UNRESOLVED_DEPENDENCIES)
-    message(FATAL_ERROR "Unresolved runtime dependencies: ${UNRESOLVED_DEPENDENCIES}")
-endif()
-
 foreach(DEPENDENCY IN LISTS RUNTIME_DEPENDENCIES)
-    file(COPY "${DEPENDENCY}" DESTINATION "${DESTINATION}")
+    if(EXISTS "${DEPENDENCY}")
+        message(STATUS "Copying dependency: ${DEPENDENCY}")
+        file(COPY "${DEPENDENCY}" DESTINATION "${DESTINATION}")
+    endif()
 endforeach()
