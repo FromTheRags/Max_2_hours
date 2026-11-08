@@ -1,4 +1,8 @@
-# Max_2_hours (Protect & Perf) - Minuteur SDL 1.2 Remastérisé
+# Max_2_hours  - Pomodoro / Minuteur
+
+<p align="center">
+  <img src="demo/windows.png" alt="Aperçu de Max_2_hours" />
+</p>
 
 [![Build & Package](https://github.com/FromTheRags/Max_2_hours/actions/workflows/build.yml/badge.svg)](https://github.com/FromTheRags/Max_2_hours/actions/workflows/build.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
@@ -28,8 +32,6 @@ Un minuteur de session (2 heures) en C++ avec SDL 1.2 et SDL_ttf, initialement c
 - **Ressources 100 % libres de droits** :
   - Police manuscrite open-source **[Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand)** (SIL OFL 1.1).
   - Graphismes originaux dédiés au domaine public (**CC0 1.0**).
-  - Suppression de la dépendance à SDL_image (rendu BMP natif avec couleur-clé).
-
 ---
 
 ## 🛠️ Compilation avec CMake
