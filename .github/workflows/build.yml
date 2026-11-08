@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup SDL3 & SDL3_ttf
         uses: libsdl-org/setup-sdl@main
@@ -39,11 +39,11 @@ jobs:
           cp build/max_2_hours dist/max_2_hours-sdl3-linux/
           cp -r assets dist/max_2_hours-sdl3-linux/
           cp assets/*.bmp assets/*.ttf dist/max_2_hours-sdl3-linux/ || true
-          cp LICENSE OFL.txt README.md dist/max_2_hours-sdl3-linux/
+          cp LICENSE LICENSES.md OFL.txt README.md dist/max_2_hours-sdl3-linux/
           cd dist && tar -czvf ../max_2_hours-sdl3-linux-x86_64.tar.gz max_2_hours-sdl3-linux
 
       - name: Upload Linux Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: max_2_hours-sdl3-linux-x86_64
           path: max_2_hours-sdl3-linux-x86_64.tar.gz
@@ -53,7 +53,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup MSYS2 MinGW-w64
         uses: msys2/setup-msys2@v2
@@ -82,12 +82,13 @@ jobs:
           cp build/max_2_hours.exe dist/max_2_hours-sdl3-windows/
           cp -r assets dist/max_2_hours-sdl3-windows/
           cp assets/*.bmp assets/*.ttf dist/max_2_hours-sdl3-windows/ || true
-          cp LICENSE OFL.txt README.md dist/max_2_hours-sdl3-windows/
+          cp LICENSE LICENSES.md OFL.txt README.md dist/max_2_hours-sdl3-windows/
+          cp build/*.dll dist/max_2_hours-sdl3-windows/ 2>/dev/null || true
           cmake -DEXECUTABLE="$PWD/build/max_2_hours.exe" -DDESTINATION="$PWD/dist/max_2_hours-sdl3-windows" -DMINGW_BIN_DIR=/mingw64/bin -P cmake/CopyRuntimeDependencies.cmake
           cd dist && cmake -E tar cf ../max_2_hours-sdl3-windows-x64.zip --format=zip max_2_hours-sdl3-windows
 
       - name: Upload Windows Portable Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: max_2_hours-sdl3-windows-x64
           path: max_2_hours-sdl3-windows-x64.zip
