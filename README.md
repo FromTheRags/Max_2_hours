@@ -16,11 +16,15 @@ Un minuteur de session (2 heures) en C++ avec SDL 3 et SDL3_ttf, initialement co
 
 ## ✨ Fonctionnalités remastérisées (SDL 3)
 
+- **Titre de fenêtre lisible** : Dimensions optimisées (360x60) pour garantir la visibilité complète du titre (« Protect & Perf - 2 Heures ») dans la barre de titre du système sans être tronqué par les boutons de contrôle (Réduire, Agrandir, Fermer).
+- **Intégration System Tray (Barre des tâches / Notification)** :
+  - **Minimisation dans le Systray** : Réduire la fenêtre la masque automatiquement de l'écran et de la barre des tâches pour la loger dans la zone de notification (Windows et Linux).
+  - **Infobulle en temps réel** : Survoler l'icône dans la zone de notification affiche le temps restant en direct.
+  - **Menu contextuel** : Clic droit permettant d'afficher la fenêtre, mettre en pause / reprendre le minuteur, ou quitter.
+  - **Rappel automatique à 5 minutes** : La fenêtre se restaure automatiquement depuis le systray et se place au premier plan (`SDL_SetWindowAlwaysOnTop`).
 - **Moteur moderne SDL 3** : Rendu graphique 2D accéléré par GPU (`SDL_Renderer` / `SDL_Texture`) avec synchronisation verticale.
 - **Décompte de 2 heures** : Affichage net et fluide du temps restant (`Temps: 02 : 00 : 00`) en orange sur fond blanc avec centrage automatique.
 - **Pause / Reprise au clic** : Mise en pause du minuteur en cliquant sur la fenêtre, avec affichage d'une icône de reprise (Play) vectorisée.
-- **Gestion des fenêtres native SDL 3** :
-  - Restauration automatique et mise au premier plan native via `SDL_SetWindowAlwaysOnTop` lors des 5 dernières minutes sans recourir à des hacks Win32 bas niveau.
 - **Mise en veille prolongée automatique** : Déclenchement de l'hibernation du système (`shutdown /h` sous Windows, `systemctl hibernate` sous Linux) dès que le décompte de 2 heures est achevé.
 - **Assets 100 % libres de droits** :
   - Typographie manuscrite open-source **[Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand)** (SIL OFL 1.1).

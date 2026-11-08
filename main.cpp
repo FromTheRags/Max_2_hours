@@ -24,9 +24,11 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-// Dimensions de la fenêtre
-const int FENETRE_L = 245;
-const int FENETRE_H = 40;
+// Dimensions de la fenêtre : largeur suffisante (360px) pour que
+// le titre de la fenêtre ("Protect & Perf - 2 Heures") soit parfaitement
+// visible dans la barre de titre du système d'exploitation
+const int FENETRE_L = 360;
+const int FENETRE_H = 60;
 
 // Variables globales d'état
 static SDL_Window *g_window = NULL;
@@ -36,6 +38,7 @@ static int g_play_w = 0;
 static int g_play_h = 0;
 static TTF_Font *g_police = NULL;
 static SDL_TimerID g_timer = 0;
+static SDL_Tray *g_tray = NULL;
 
 static int g_heures = 2;
 static int g_minutes = 0;
@@ -44,6 +47,10 @@ static int g_playing = 1;
 static bool g_only_one = true;
 
 static const SDL_Color g_couleur_orange = {255, 123, 0, 255};
+
+// Déclarations préalables
+static void basculer_pause();
+static void restaurer_fenetre();
 
 // Détermination portable du répertoire de l'exécutable
 static std::string get_executable_dir()
@@ -114,7 +121,7 @@ static std::string get_asset_path(const char *name)
         }
     }
 
-    // 3. Répertoire parent : ../assets/<name> (utile en mode debug / build)
+    // 3. Répertoire parent : ../assets/<name> (utile en build/debug)
     candidate = std::string("../assets/") + name;
     f = fopen(candidate.c_str(), "rb");
     if (f)
@@ -171,7 +178,7 @@ static void actualiser_affichage()
     }
     else
     {
-        // En pause : afficher l'icône lecture au centre
+        // En pause : afficher l'icône de lecture au centre
         if (g_play_texture)
         {
             SDL_FRect dst;
@@ -186,6 +193,15 @@ static void actualiser_affichage()
     SDL_RenderPresent(g_renderer);
 }
 
+// Mise à jour de l'infobulle du System Tray avec le temps restant
+static void actualiser_tray_tooltip()
+{
+    if (!g_tray) return;
+    char tooltip[128] = {0};
+    snprintf(tooltip, sizeof(tooltip), "Protect & Perf - %02d : %02d : %02d", g_heures, g_minutes, g_secondes);
+    SDL_SetTrayTooltip(g_tray, tooltip);
+}
+
 // Callback appelé chaque seconde par le Timer SDL 3
 static Uint32 SDLCALL timer_callback(void *userdata, SDL_TimerID timerID, Uint32 interval)
 {
@@ -196,6 +212,75 @@ static Uint32 SDLCALL timer_callback(void *userdata, SDL_TimerID timerID, Uint32
     event.type = SDL_EVENT_USER;
     SDL_PushEvent(&event);
     return interval;
+}
+
+// Restauration de la fenêtre depuis la barre des tâches / systray
+static void restaurer_fenetre()
+{
+    if (g_window)
+    {
+        SDL_ShowWindow(g_window);
+        SDL_RestoreWindow(g_window);
+        SDL_RaiseWindow(g_window);
+    }
+}
+
+// Callbacks pour le menu du System Tray
+static void SDLCALL on_tray_restaurer(void *userdata, SDL_TrayEntry *entry)
+{
+    (void)userdata;
+    (void)entry;
+    restaurer_fenetre();
+}
+
+static void SDLCALL on_tray_pause(void *userdata, SDL_TrayEntry *entry)
+{
+    (void)userdata;
+    (void)entry;
+    basculer_pause();
+}
+
+static void SDLCALL on_tray_quitter(void *userdata, SDL_TrayEntry *entry)
+{
+    (void)userdata;
+    (void)entry;
+    SDL_Event ev;
+    SDL_zero(ev);
+    ev.type = SDL_EVENT_QUIT;
+    SDL_PushEvent(&ev);
+}
+
+// Initialisation du System Tray natif cross-platform (Windows & Linux)
+static void init_systray()
+{
+    std::string icon_path = get_asset_path("app_icon.bmp");
+    SDL_Surface *tray_icon = SDL_LoadBMP(icon_path.c_str());
+    if (tray_icon)
+    {
+        SDL_SetSurfaceColorKey(tray_icon, true, SDL_MapSurfaceRGB(tray_icon, 255, 0, 255));
+    }
+
+    g_tray = SDL_CreateTray(tray_icon, "Protect & Perf - 2 Heures");
+    if (g_tray)
+    {
+        SDL_TrayMenu *menu = SDL_CreateTrayMenu(g_tray);
+        if (menu)
+        {
+            SDL_TrayEntry *e_restore = SDL_InsertTrayEntryAt(menu, -1, "Afficher la fenetre", SDL_TRAYENTRY_BUTTON);
+            if (e_restore) SDL_SetTrayEntryCallback(e_restore, on_tray_restaurer, NULL);
+
+            SDL_TrayEntry *e_pause = SDL_InsertTrayEntryAt(menu, -1, "Pause / Reprendre", SDL_TRAYENTRY_BUTTON);
+            if (e_pause) SDL_SetTrayEntryCallback(e_pause, on_tray_pause, NULL);
+
+            SDL_TrayEntry *e_quit = SDL_InsertTrayEntryAt(menu, -1, "Quitter", SDL_TRAYENTRY_BUTTON);
+            if (e_quit) SDL_SetTrayEntryCallback(e_quit, on_tray_quitter, NULL);
+        }
+    }
+
+    if (tray_icon)
+    {
+        SDL_DestroySurface(tray_icon);
+    }
 }
 
 // Mise à jour du décompte chaque seconde
@@ -224,6 +309,7 @@ static void tick_seconde()
             g_minutes = 0;
             g_secondes = 0;
             actualiser_affichage();
+            actualiser_tray_tooltip();
             if (g_timer != 0)
             {
                 SDL_RemoveTimer(g_timer);
@@ -240,18 +326,20 @@ static void tick_seconde()
         }
     }
 
-    // Alerte automatique à moins de 5 minutes restantes
+    // Alerte automatique à moins de 5 minutes restantes :
+    // On restaure immédiatement la fenêtre et on la place au premier plan
     if (g_minutes <= 5 && g_heures <= 0 && g_only_one)
     {
+        restaurer_fenetre();
         if (g_window)
         {
-            SDL_RestoreWindow(g_window);
             SDL_SetWindowAlwaysOnTop(g_window, true);
         }
         g_only_one = false;
     }
 
     actualiser_affichage();
+    actualiser_tray_tooltip();
 }
 
 // Bascule Lecture / Pause
@@ -301,7 +389,7 @@ int main(int argc, char** argv)
     g_window = SDL_CreateWindow("Protect & Perf - 2 Heures", FENETRE_L, FENETRE_H, 0);
     if (!g_window)
     {
-        fprintf(stderr, "Impossible de créer la fenêtre SDL 3: %s\n", SDL_GetError());
+        fprintf(stderr, "Impossible de creer la fenetre SDL 3: %s\n", SDL_GetError());
         TTF_Quit();
         SDL_Quit();
         return EXIT_FAILURE;
@@ -310,7 +398,7 @@ int main(int argc, char** argv)
     g_renderer = SDL_CreateRenderer(g_window, NULL);
     if (!g_renderer)
     {
-        fprintf(stderr, "Impossible de créer le renderer SDL 3: %s\n", SDL_GetError());
+        fprintf(stderr, "Impossible de creer le renderer SDL 3: %s\n", SDL_GetError());
         SDL_DestroyWindow(g_window);
         TTF_Quit();
         SDL_Quit();
@@ -327,12 +415,16 @@ int main(int argc, char** argv)
         SDL_DestroySurface(icon);
     }
 
+    // Initialisation du System Tray natif (Windows & Linux)
+    init_systray();
+
     // Chargement de la police libre (Patrick Hand sous licence SIL OFL)
     std::string font_path = get_asset_path("PatrickHand-Regular.ttf");
-    g_police = TTF_OpenFont(font_path.c_str(), 32);
+    g_police = TTF_OpenFont(font_path.c_str(), 36);
     if (!g_police)
     {
         fprintf(stderr, "Erreur chargement police '%s': %s\n", font_path.c_str(), SDL_GetError());
+        if (g_tray) SDL_DestroyTray(g_tray);
         SDL_DestroyRenderer(g_renderer);
         SDL_DestroyWindow(g_window);
         TTF_Quit();
@@ -354,6 +446,7 @@ int main(int argc, char** argv)
 
     // Premier affichage et lancement du timer
     actualiser_affichage();
+    actualiser_tray_tooltip();
     g_timer = SDL_AddTimer(1000, timer_callback, NULL);
 
     bool continuer = true;
@@ -378,10 +471,8 @@ int main(int argc, char** argv)
                 break;
 
             case SDL_EVENT_WINDOW_MINIMIZED:
-                if (g_minutes <= 5 && g_heures <= 0 && g_playing == 1)
-                {
-                    SDL_RestoreWindow(g_window);
-                }
+                // Minimisation : masquer la fenêtre pour la placer dans le System Tray
+                SDL_HideWindow(g_window);
                 break;
 
             default:
@@ -395,6 +486,11 @@ int main(int argc, char** argv)
     {
         SDL_RemoveTimer(g_timer);
         g_timer = 0;
+    }
+    if (g_tray)
+    {
+        SDL_DestroyTray(g_tray);
+        g_tray = NULL;
     }
     if (g_play_texture)
     {
