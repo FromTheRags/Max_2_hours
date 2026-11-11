@@ -42,7 +42,7 @@ void systray_minimiser()
         {
             g_nid.hIcon = (HICON)GetClassLongPtr(g_hwnd, GCLP_HICON);
         }
-        snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
+        snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s %s - %02d : %02d : %02d", TITRE_APPLICATION, get_version_string().c_str(), g_heures, g_minutes, g_secondes);
         Shell_NotifyIconA(NIM_ADD, &g_nid);
     }
 }
@@ -161,11 +161,11 @@ void systray_actualiser()
         }
         if (g_playing == 1)
         {
-            snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
+            snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s %s - %02d : %02d : %02d", TITRE_APPLICATION, get_version_string().c_str(), g_heures, g_minutes, g_secondes);
         }
         else
         {
-            snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s [PAUSE] - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
+            snprintf(g_nid.szTip, sizeof(g_nid.szTip), "%s %s [PAUSE] - %02d : %02d : %02d", TITRE_APPLICATION, get_version_string().c_str(), g_heures, g_minutes, g_secondes);
         }
         g_nid.uFlags = NIF_ICON | NIF_TIP;
         Shell_NotifyIconA(NIM_MODIFY, &g_nid);
