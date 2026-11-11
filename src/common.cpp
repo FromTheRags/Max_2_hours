@@ -52,6 +52,15 @@ static std::string get_executable_dir()
     return "";
 }
 
+std::string get_version_string()
+{
+    const int v = SDL_GetVersion();
+    char buffer[96];
+    snprintf(buffer, sizeof(buffer), "v%s (SDL %d.%d.%d)", APP_VERSION,
+             SDL_VERSIONNUM_MAJOR(v), SDL_VERSIONNUM_MINOR(v), SDL_VERSIONNUM_MICRO(v));
+    return std::string(buffer);
+}
+
 std::string get_asset_path(const char *name)
 {
     // 1. Relatif au répertoire de travail : assets/<name>

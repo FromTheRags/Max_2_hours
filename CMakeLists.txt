@@ -4,6 +4,13 @@ project(max_2_hours LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Application version: read from VERSION file, can be overridden with -DAPP_VERSION=x.y.z (CI does this on tags)
+if(NOT APP_VERSION)
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" APP_VERSION LIMIT_COUNT 1)
+endif()
+string(STRIP "${APP_VERSION}" APP_VERSION)
+message(STATUS "Application version: ${APP_VERSION}")
+
 # Architecture detection (x64 vs x86) for Windows prebuilt libraries
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(ARCH_DIR "x64")
@@ -104,6 +111,8 @@ endif()
 
 # Executable target
 add_executable(max_2_hours ${SOURCES})
+
+target_compile_definitions(max_2_hours PRIVATE APP_VERSION="${APP_VERSION}")
 
 target_include_directories(max_2_hours PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

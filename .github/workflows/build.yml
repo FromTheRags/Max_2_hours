@@ -15,6 +15,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Compute application version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(head -n1 VERSION | tr -d '\r ')"
+          fi
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
       - name: Setup SDL3 & SDL3_ttf
         uses: libsdl-org/setup-sdl@main
         id: sdl
@@ -29,7 +38,7 @@ jobs:
           sudo apt-get install -y cmake ninja-build
 
       - name: Configure CMake
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ steps.sdl.outputs.prefix }}"
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DAPP_VERSION="$APP_VERSION" -DCMAKE_PREFIX_PATH="${{ steps.sdl.outputs.prefix }}"
 
       - name: Build project
         run: cmake --build build --config Release
@@ -62,6 +71,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Compute application version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(head -n1 VERSION | tr -d '\r ')"
+          fi
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
       - name: Setup MSYS2 MinGW-w64
         uses: msys2/setup-msys2@v2
         with:
@@ -76,7 +94,7 @@ jobs:
 
       - name: Configure CMake
         shell: msys2 {0}
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DAPP_VERSION="$APP_VERSION"
 
       - name: Build project
         shell: msys2 {0}
@@ -99,6 +117,22 @@ jobs:
         with:
           name: max_2_hours-sdl3-windows-x64
           path: max_2_hours-sdl3-windows-x64.zip
+
+      - name: Build Inno Setup installer (no admin rights required)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=$env:APP_VERSION" "/DSdlLabel=SDL 3" `
+            "/DSourceDir=$PWD\dist\max_2_hours-sdl3-windows" "/DOutputDir=$PWD" `
+            "/DOutputBaseName=max_2_hours-sdl3-setup-x64" installer\max_2_hours.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows Installer Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: max_2_hours-sdl3-setup-x64
+          path: max_2_hours-sdl3-setup-x64.exe
 
   release:
     name: Create GitHub Release

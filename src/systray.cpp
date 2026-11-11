@@ -167,11 +167,11 @@ void systray_actualiser()
     char tooltip[128] = {0};
     if (g_playing == 1)
     {
-        snprintf(tooltip, sizeof(tooltip), "%s - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
+        snprintf(tooltip, sizeof(tooltip), "%s %s - %02d : %02d : %02d", TITRE_APPLICATION, get_version_string().c_str(), g_heures, g_minutes, g_secondes);
     }
     else
     {
-        snprintf(tooltip, sizeof(tooltip), "%s [PAUSE] - %02d : %02d : %02d", TITRE_APPLICATION, g_heures, g_minutes, g_secondes);
+        snprintf(tooltip, sizeof(tooltip), "%s %s [PAUSE] - %02d : %02d : %02d", TITRE_APPLICATION, get_version_string().c_str(), g_heures, g_minutes, g_secondes);
     }
     SDL_SetTrayTooltip(g_tray, tooltip);
 
